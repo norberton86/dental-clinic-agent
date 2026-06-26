@@ -1,0 +1,40 @@
+[project]
+name = "dental-voice-pipecat"
+version = "0.1.0"
+description = "Real-time Spanish dental-clinic voice agent: Telnyx media streaming + Pipecat + Deepgram (STT+TTS) + LangGraph"
+requires-python = ">=3.12"
+dependencies = [
+    # Pipecat + the services/transports we use (extras pull the provider SDKs)
+    "pipecat-ai[deepgram,cartesia,elevenlabs,azure,silero,telnyx]>=0.0.60",
+    # web server for the runner's webhook + media websocket transport
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "websockets>=12.0",
+    # LangGraph / LangChain agent
+    "langgraph>=0.2.50",
+    "langchain-core>=0.3.0",
+    "langchain-openai>=0.2.0",
+    "langchain-anthropic>=0.2.0",
+    # HTTP + config + logging
+    "httpx>=0.27.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    "structlog>=24.1.0",
+    "python-dotenv>=1.0.1",
+    "deepgram-sdk>=3.7.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+    "respx>=0.21.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
+testpaths = ["src/tests"]
+
+[tool.uv]
+package = false
