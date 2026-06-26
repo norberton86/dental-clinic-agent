@@ -78,20 +78,25 @@ def _build_body(
 
 
 def _button(url: str, text: str, color: str) -> str:
-    # Table-cell layout is the bulletproof way to vertically centre icon/label/arrow
-    # in email (Gmail strips flex/gap; tables + valign=middle work everywhere incl.
-    # Outlook). Each part is its own cell with padding for spacing.
+    # The clickable <a> MUST live INSIDE the cells: Gmail strips an <a> that WRAPS a
+    # <table>, leaving the button with no link at all. Each cell holds a block-level
+    # link (padding inside it, so the whole cell is clickable); the colour + rounded
+    # corners sit on the <td>, and td valign=middle keeps icon/label/arrow centred.
+    href = escape(url, quote=True)
+    link = "display:block;text-decoration:none;color:#ffffff;cursor:pointer;"
     return (
-        f'<a href="{escape(url, quote=True)}" style="text-decoration:none;display:inline-block;margin:6px 0;cursor:pointer;">'
-        f'<table role="presentation" border="0" cellpadding="0" cellspacing="0" '
-        f'style="border-collapse:separate;border-radius:6px;background:{color};cursor:pointer;">'
-        f"<tr>"
-        f'<td style="padding:12px 0 12px 18px;vertical-align:middle;font-size:18px;line-height:1;cursor:pointer;">📅</td>'
-        f'<td style="padding:12px 14px;vertical-align:middle;font-family:Arial,Helvetica,sans-serif;'
-        f'font-size:15px;font-weight:bold;color:#ffffff;white-space:nowrap;cursor:pointer;">{escape(text)}</td>'
-        f'<td style="padding:12px 20px 12px 0;vertical-align:middle;font-size:22px;font-weight:bold;'
-        f'color:#ffffff;line-height:1;cursor:pointer;">&#10132;</td>'
-        f"</tr></table></a>"
+        '<table role="presentation" border="0" cellpadding="0" cellspacing="0" '
+        'style="border-collapse:separate;margin:6px 0;">'
+        "<tr>"
+        f'<td style="background:{color};border-radius:6px 0 0 6px;vertical-align:middle;">'
+        f'<a href="{href}" style="{link}padding:12px 0 12px 18px;font-size:18px;line-height:1;">📅</a></td>'
+        f'<td style="background:{color};vertical-align:middle;">'
+        f'<a href="{href}" style="{link}padding:12px 14px;font-family:Arial,Helvetica,sans-serif;'
+        f'font-size:15px;font-weight:bold;white-space:nowrap;">{escape(text)}</a></td>'
+        f'<td style="background:{color};border-radius:0 6px 6px 0;vertical-align:middle;">'
+        f'<a href="{href}" style="{link}padding:12px 20px 12px 0;font-size:22px;font-weight:bold;'
+        f'line-height:1;">&#10132;</a></td>'
+        "</tr></table>"
     )
 
 
