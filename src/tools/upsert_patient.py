@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from langchain_core.tools import StructuredTool
 
-from ..models.schemas import ToolEnvelope, UpsertPatientArgs
-from ..services.supabase_client import SupabaseClient, SupabaseError
+from ..models.schemas import UpsertPatientArgs
+from ..services.supabase_client import SupabaseClient
+from ._common import rpc_envelope
 
 
 def make_tool(client: SupabaseClient, phone: str) -> StructuredTool:
@@ -14,11 +15,7 @@ def make_tool(client: SupabaseClient, phone: str) -> StructuredTool:
             "p_phone": phone,
             "p_email": email,
         }
-        try:
-            data = await client.rpc("upsert_patient", payload)
-            return ToolEnvelope.ok(data=data).to_tool_string()
-        except SupabaseError as exc:
-            return ToolEnvelope.fail(str(exc)).to_tool_string()
+        return await rpc_envelope(client, "upsert_patient", payload)
 
     return StructuredTool.from_function(
         coroutine=_run,
