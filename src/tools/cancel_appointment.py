@@ -2,21 +2,17 @@ from __future__ import annotations
 
 from langchain_core.tools import StructuredTool
 
-from ..models.schemas import EmptyArgs, ToolEnvelope
-from ..services.supabase_client import SupabaseClient, SupabaseError
+from ..models.schemas import EmptyArgs
+from ..services.supabase_client import SupabaseClient
+from ._common import gate_check, rpc_envelope
 
 
 def make_tool(client: SupabaseClient, phone: str, gate) -> StructuredTool:
     async def _run() -> str:
-        verdict, msg = gate.evaluate("cancel", {})
-        if verdict == "hold":
-            return ToolEnvelope.pending(msg).to_tool_string()
-        # (no fields to validate for cancel; verdict is "hold" or "execute")
-        try:
-            data = await client.rpc("cancel_appointment", {"p_phone": phone})
-            return ToolEnvelope.ok(data=data).to_tool_string()
-        except SupabaseError as exc:
-            return ToolEnvelope.fail(str(exc)).to_tool_string()
+        blocked = gate_check(gate, "cancel", {})  # no fields to validate; "hold" or proceed
+        if blocked is not None:
+            return blocked
+        return await rpc_envelope(client, "cancel_appointment", {"p_phone": phone})
 
     return StructuredTool.from_function(
         coroutine=_run,

@@ -2,28 +2,24 @@ from __future__ import annotations
 
 from langchain_core.tools import StructuredTool
 
-from ..models.schemas import RescheduleArgs, ToolEnvelope
-from ..services.supabase_client import SupabaseClient, SupabaseError
+from ..models.schemas import RescheduleArgs
+from ..services.supabase_client import SupabaseClient
+from ._common import gate_check, rpc_envelope
 
 
 def make_tool(client: SupabaseClient, phone: str, gate) -> StructuredTool:
     async def _run(new_date: str, new_time: str, new_service_name: str | None = None) -> str:
-        verdict, msg = gate.evaluate(
+        blocked = gate_check(
+            gate,
             "reschedule",
             {"new_date": new_date, "new_time": new_time, "new_service_name": new_service_name},
         )
-        if verdict == "error":
-            return ToolEnvelope.fail(msg).to_tool_string()
-        if verdict == "hold":
-            return ToolEnvelope.pending(msg).to_tool_string()
+        if blocked is not None:
+            return blocked
         payload = {"p_phone": phone, "p_new_date": new_date, "p_new_time": new_time}
         if new_service_name:
             payload["p_new_service_name"] = new_service_name
-        try:
-            data = await client.rpc("reschedule_appointment_safe", payload)
-            return ToolEnvelope.ok(data=data).to_tool_string()
-        except SupabaseError as exc:
-            return ToolEnvelope.fail(str(exc)).to_tool_string()
+        return await rpc_envelope(client, "reschedule_appointment_safe", payload)
 
     return StructuredTool.from_function(
         coroutine=_run,

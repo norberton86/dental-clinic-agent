@@ -26,6 +26,15 @@ _SUBJECTS = {
 }
 
 
+def _selected_links(
+    service: str, date: str, time: str, tz_name: str, clinic_name: str, recipient_email: str
+) -> dict[str, str]:
+    """Calendar links filtered to the recipient's provider (empty if no valid date/time)."""
+    return select_links_for_email(
+        recipient_email, build_calendar_links(service, date, time, tz_name, clinic_name)
+    )
+
+
 def _build_body(
     operation: str,
     name: str,
@@ -51,9 +60,7 @@ def _build_body(
     # matching the recipient's email provider (both if it's a custom/unknown domain).
     calendar = ""
     if operation in ("booking", "reschedule"):
-        links = select_links_for_email(
-            recipient_email, build_calendar_links(service, date, time, tz_name, clinic_name)
-        )
+        links = _selected_links(service, date, time, tz_name, clinic_name, recipient_email)
         if links:
             lines = ["\n\nAñada la cita a su calendario:"]
             if "google" in links:
@@ -110,9 +117,7 @@ def _build_html(
 
     buttons = ""
     if operation in ("booking", "reschedule"):
-        links = select_links_for_email(
-            recipient_email, build_calendar_links(service, date, time, tz_name, clinic_name)
-        )
+        links = _selected_links(service, date, time, tz_name, clinic_name, recipient_email)
         btns = []
         if "google" in links:
             btns.append(_button(links["google"], "Añadir a Google Calendar", "#1a73e8"))
