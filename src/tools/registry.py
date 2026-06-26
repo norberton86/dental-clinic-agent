@@ -49,6 +49,8 @@ class CallSession:
     transfer_to: str
     gate: ConfirmationGate  # per-call confirm/validate gate for mutating tools
     control: CallControl    # deferred-hangup signal
+    clinic_name: str = "Clínica Dental Smile"
+    timezone: str = "Europe/Madrid"  # clinic timezone for calendar links
 
 
 def build_tools(session: CallSession) -> list[BaseTool]:
@@ -61,7 +63,9 @@ def build_tools(session: CallSession) -> list[BaseTool]:
         book_appointment_safe.make_tool(sb, phone, gate),
         reschedule_appointment_safe.make_tool(sb, phone, gate),
         cancel_appointment.make_tool(sb, phone, gate),
-        send_appointment_email.make_tool(session.email, sb, phone),
+        send_appointment_email.make_tool(
+            session.email, sb, phone, tz_name=session.timezone, clinic_name=session.clinic_name
+        ),
         transfer_call.make_tool(session.control, session.transfer_to),
         hangup_call.make_tool(session.control),
     ]

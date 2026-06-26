@@ -91,6 +91,8 @@ async def bot(runner_args: RunnerArguments) -> None:
         transfer_to=settings.human_transfer_number,
         gate=ConfirmationGate(),
         control=CallControl(),
+        clinic_name=settings.clinic_name,
+        timezone=settings.calendar_timezone,
     )
 
     task = build_pipeline_task(transport, session, settings)
