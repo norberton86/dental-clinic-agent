@@ -7,10 +7,13 @@ from __future__ import annotations
 
 import re
 
+import structlog
 from langchain_core.tools import StructuredTool
 
 from ..models.schemas import AppointmentEmailArgs, ToolEnvelope
 from ..services.email_service import EmailService
+
+log = structlog.get_logger(__name__)
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -39,7 +42,12 @@ def _build_body(operation: str, name: str, service: str, date: str, time: str) -
     )
 
 
-def make_tool(email_service: EmailService, patient_name_default: str = "") -> StructuredTool:
+def make_tool(
+    email_service: EmailService,
+    supabase=None,
+    phone: str = "",
+    patient_name_default: str = "",
+) -> StructuredTool:
     async def _run(
         email: str,
         operation: str,
@@ -69,6 +77,14 @@ def make_tool(email_service: EmailService, patient_name_default: str = "") -> St
             return ToolEnvelope.fail(
                 f"No se pudo enviar el correo ({exc}). Discúlpese con el paciente."
             ).to_tool_string()
+
+        # Persist the address to the patient record (email-only update, never blanks
+        # the name). Best-effort: a save failure must NOT fail the already-sent email.
+        if supabase is not None and phone:
+            try:
+                await supabase.rpc("update_patient_email", {"p_phone": phone, "p_email": email})
+            except Exception as exc:  # noqa: BLE001
+                log.warning("email.persist_failed", phone=phone, error=str(exc))
 
         return ToolEnvelope.ok(message=f"Correo enviado correctamente a {email}.").to_tool_string()
 

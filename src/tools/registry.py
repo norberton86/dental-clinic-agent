@@ -61,7 +61,7 @@ def build_tools(session: CallSession) -> list[BaseTool]:
         book_appointment_safe.make_tool(sb, phone, gate),
         reschedule_appointment_safe.make_tool(sb, phone, gate),
         cancel_appointment.make_tool(sb, phone, gate),
-        send_appointment_email.make_tool(session.email),
+        send_appointment_email.make_tool(session.email, sb, phone),
         transfer_call.make_tool(session.control, session.transfer_to),
         hangup_call.make_tool(session.control),
     ]

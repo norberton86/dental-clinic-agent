@@ -30,7 +30,7 @@ class EmailService:
         self._port = port
         self._username = username
         self._password = password
-        self._from_addr = from_addr
+        self._from_addr = (from_addr or "").strip() or None
         self._from_name = from_name
         self._use_tls = use_tls
 
