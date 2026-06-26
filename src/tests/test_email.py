@@ -55,7 +55,7 @@ async def test_sends_valid_booking_email():
     to, subject, body = svc.sent[0]
     assert to == "norberto@gmail.com"
     assert "Confirmación" in subject
-    assert "limpieza" in body and "Norberto" in body
+    assert "LIMPIEZA" in body and "Norberto" in body  # service shown uppercase
 
 
 @pytest.mark.asyncio

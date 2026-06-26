@@ -27,7 +27,8 @@ _SUBJECTS = {
 def _build_body(operation: str, name: str, service: str, date: str, time: str) -> str:
     greeting = f"Hola {name}," if name else "Hola,"
     when = " ".join(p for p in (f"el {date}" if date else "", f"a las {time}" if time else "") if p)
-    svc = service or "su cita"
+    # Service name is shown in UPPERCASE in the email.
+    svc = service.strip().upper() if service and service.strip() else "su cita"
     if operation == "cancellation":
         detail = f"Le confirmamos que su cita de {svc} {when} ha sido CANCELADA."
     elif operation == "reschedule":
