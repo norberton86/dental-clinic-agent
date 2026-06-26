@@ -47,6 +47,16 @@ class Settings(BaseSettings):
     human_transfer_number: str = ""
     default_country_code: str = "+34"
 
+    # Email (SMTP) — optional appointment confirmation/reminder emails.
+    # Works with any SMTP provider (Gmail app password, Resend, SendGrid, SES…).
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = None
+    email_from: str | None = None
+    email_from_name: str = "Clínica Dental Smile"
+    smtp_use_tls: bool = True
+
     # Logging
     log_level: str = "INFO"
 

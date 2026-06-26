@@ -64,6 +64,17 @@ class RescheduleArgs(BaseModel):
     )
 
 
+class AppointmentEmailArgs(BaseModel):
+    email: str = Field(..., description="Recipient email address, EXACTLY as confirmed (spelled back) with the caller")
+    operation: Literal["booking", "reschedule", "cancellation"] = Field(
+        ..., description="Which operation just completed successfully"
+    )
+    service: str = Field("", description="Service in Spanish: limpieza / blanqueamiento / extracción")
+    date: str = Field("", description="Appointment date, YYYY-MM-DD")
+    time: str = Field("", description="Appointment time, HH:MM 24h")
+    patient_name: str = Field("", description="Caller's first name, if known")
+
+
 class EmptyArgs(BaseModel):
     """For tools whose only input is the injected session phone."""
     pass

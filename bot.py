@@ -20,6 +20,7 @@ from pipecat.transports.websocket.fastapi import FastAPIWebsocketParams
 
 from src.config.settings import get_settings
 from src.graph.confirmation_gate import ConfirmationGate
+from src.services.email_service import EmailService
 from src.services.phone import normalize_phone
 from src.services.supabase_client import SupabaseClient
 from src.services.telnyx_client import TelnyxClient
@@ -72,11 +73,21 @@ async def bot(runner_args: RunnerArguments) -> None:
 
     supabase = SupabaseClient(settings.supabase_url, settings.supabase_service_key)
     telnyx = TelnyxClient(settings.telnyx_api_key)
+    email = EmailService(
+        host=settings.smtp_host,
+        port=settings.smtp_port,
+        username=settings.smtp_username,
+        password=settings.smtp_password,
+        from_addr=settings.email_from,
+        from_name=settings.email_from_name,
+        use_tls=settings.smtp_use_tls,
+    )
     session = CallSession(
         call_control_id=call_control_id,
         caller_phone=caller_phone,
         supabase=supabase,
         telnyx=telnyx,
+        email=email,
         transfer_to=settings.human_transfer_number,
         gate=ConfirmationGate(),
         control=CallControl(),
