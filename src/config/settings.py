@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     email_from_name: str = "Clínica Dental Smile"
     smtp_use_tls: bool = True
 
+    # Calendar — "Add to calendar" links in confirmation emails (booking/reschedule).
+    clinic_name: str = "Clínica Dental Smile"
+    calendar_timezone: str = "Europe/Madrid"  # the CLINIC's timezone (where the appointment is)
+
     # Logging
     log_level: str = "INFO"
 

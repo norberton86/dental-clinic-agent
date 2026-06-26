@@ -15,15 +15,17 @@ class FakeEmail:
         self._configured = configured
         self._error = error
         self.sent: list[tuple[str, str, str]] = []
+        self.html: list[str | None] = []
 
     @property
     def configured(self) -> bool:
         return self._configured
 
-    async def send(self, to: str, subject: str, body: str) -> None:
+    async def send(self, to: str, subject: str, body: str, html: str | None = None) -> None:
         if self._error:
             raise self._error
         self.sent.append((to, subject, body))
+        self.html.append(html)
 
 
 class FakeSupabase:
@@ -113,6 +115,65 @@ async def test_persist_failure_does_not_fail_the_sent_email():
     out = json.loads(await tool.coroutine(email="ok@gmail.com", operation="booking"))
     assert out["status"] == "success"  # email already sent; persist failure is swallowed
     assert svc.sent and svc.sent[0][0] == "ok@gmail.com"
+
+
+@pytest.mark.asyncio
+async def test_booking_email_includes_calendar_links():
+    svc = FakeEmail()
+    tool = send_appointment_email.make_tool(svc)
+    await tool.coroutine(email="a@b.com", operation="booking", service="limpieza", date="2026-07-01", time="09:30")
+    _, _, body = svc.sent[0]
+    assert "calendar.google.com/calendar/render" in body
+    assert "outlook.office.com" in body
+
+
+@pytest.mark.asyncio
+async def test_html_part_has_calendar_button():
+    svc = FakeEmail()
+    tool = send_appointment_email.make_tool(svc)
+    await tool.coroutine(email="p@gmail.com", operation="booking", service="limpieza", date="2026-07-01", time="09:30")
+    html = svc.html[0]
+    assert html is not None
+    assert "Añadir a Google Calendar" in html          # button label (not raw URL)
+    assert "vertical-align:middle" in html and "&#10132;" in html  # table-centered button + bold arrow
+    assert 'href="https://calendar.google.com' in html  # link is behind the button
+    assert "outlook" not in html.lower()                # gmail → google only
+
+
+@pytest.mark.asyncio
+async def test_gmail_recipient_gets_only_google_link():
+    svc = FakeEmail()
+    tool = send_appointment_email.make_tool(svc)
+    await tool.coroutine(email="p@gmail.com", operation="booking", service="limpieza", date="2026-07-01", time="09:30")
+    _, _, body = svc.sent[0]
+    assert "calendar.google.com" in body and "outlook.office.com" not in body
+
+
+@pytest.mark.asyncio
+async def test_outlook_recipient_gets_only_outlook_link():
+    svc = FakeEmail()
+    tool = send_appointment_email.make_tool(svc)
+    await tool.coroutine(email="p@outlook.com", operation="booking", service="limpieza", date="2026-07-01", time="09:30")
+    _, _, body = svc.sent[0]
+    assert "outlook.office.com" in body and "calendar.google.com" not in body
+
+
+@pytest.mark.asyncio
+async def test_custom_domain_gets_both_links():
+    svc = FakeEmail()
+    tool = send_appointment_email.make_tool(svc)
+    await tool.coroutine(email="p@miclinica.com", operation="booking", service="limpieza", date="2026-07-01", time="09:30")
+    _, _, body = svc.sent[0]
+    assert "calendar.google.com" in body and "outlook.office.com" in body
+
+
+@pytest.mark.asyncio
+async def test_cancellation_email_has_no_calendar_links():
+    svc = FakeEmail()
+    tool = send_appointment_email.make_tool(svc)
+    await tool.coroutine(email="a@b.com", operation="cancellation", service="extracción", date="2026-07-01", time="09:30")
+    _, _, body = svc.sent[0]
+    assert "calendar.google.com" not in body and "outlook.office.com" not in body
 
 
 @pytest.mark.asyncio

@@ -6,11 +6,13 @@ everything else is built here so the message wording is controlled.
 from __future__ import annotations
 
 import re
+from html import escape
 
 import structlog
 from langchain_core.tools import StructuredTool
 
 from ..models.schemas import AppointmentEmailArgs, ToolEnvelope
+from ..services.calendar_links import build_calendar_links, select_links_for_email
 from ..services.email_service import EmailService
 
 log = structlog.get_logger(__name__)
@@ -24,7 +26,16 @@ _SUBJECTS = {
 }
 
 
-def _build_body(operation: str, name: str, service: str, date: str, time: str) -> str:
+def _build_body(
+    operation: str,
+    name: str,
+    service: str,
+    date: str,
+    time: str,
+    tz_name: str = "Europe/Madrid",
+    clinic_name: str = "Clínica Dental Smile",
+    recipient_email: str = "",
+) -> str:
     greeting = f"Hola {name}," if name else "Hola,"
     when = " ".join(p for p in (f"el {date}" if date else "", f"a las {time}" if time else "") if p)
     # Service name is shown in UPPERCASE in the email.
@@ -35,11 +46,94 @@ def _build_body(operation: str, name: str, service: str, date: str, time: str) -
         detail = f"Su cita ha sido reprogramada: {svc} {when}."
     else:
         detail = f"Le confirmamos su cita: {svc} {when}."
+
+    # "Add to calendar" links — only for an upcoming appointment, and only the link
+    # matching the recipient's email provider (both if it's a custom/unknown domain).
+    calendar = ""
+    if operation in ("booking", "reschedule"):
+        links = select_links_for_email(
+            recipient_email, build_calendar_links(service, date, time, tz_name, clinic_name)
+        )
+        if links:
+            lines = ["\n\nAñada la cita a su calendario:"]
+            if "google" in links:
+                lines.append(f"• Google Calendar: {links['google']}")
+            if "outlook" in links:
+                lines.append(f"• Outlook: {links['outlook']}")
+            calendar = "\n".join(lines) + "\n"
+
     return (
-        f"{greeting}\n\n{detail}\n\n"
-        "Gracias por confiar en la Clínica Dental Smile. Si necesita cualquier "
-        "cambio, llámenos y estaremos encantados de ayudarle.\n\n"
-        "Un saludo,\nClínica Dental Smile"
+        f"{greeting}\n\n{detail}{calendar}\n\n"
+        f"Gracias por confiar en la {clinic_name}. Si necesita cualquier cambio, "
+        "llámenos y estaremos encantados de ayudarle.\n\n"
+        f"Un saludo,\n{clinic_name}"
+    )
+
+
+def _button(url: str, text: str, color: str) -> str:
+    # Table-cell layout is the bulletproof way to vertically centre icon/label/arrow
+    # in email (Gmail strips flex/gap; tables + valign=middle work everywhere incl.
+    # Outlook). Each part is its own cell with padding for spacing.
+    return (
+        f'<a href="{escape(url, quote=True)}" style="text-decoration:none;display:inline-block;margin:6px 0;cursor:pointer;">'
+        f'<table role="presentation" border="0" cellpadding="0" cellspacing="0" '
+        f'style="border-collapse:separate;border-radius:6px;background:{color};cursor:pointer;">'
+        f"<tr>"
+        f'<td style="padding:12px 0 12px 18px;vertical-align:middle;font-size:18px;line-height:1;cursor:pointer;">📅</td>'
+        f'<td style="padding:12px 14px;vertical-align:middle;font-family:Arial,Helvetica,sans-serif;'
+        f'font-size:15px;font-weight:bold;color:#ffffff;white-space:nowrap;cursor:pointer;">{escape(text)}</td>'
+        f'<td style="padding:12px 20px 12px 0;vertical-align:middle;font-size:22px;font-weight:bold;'
+        f'color:#ffffff;line-height:1;cursor:pointer;">&#10132;</td>'
+        f"</tr></table></a>"
+    )
+
+
+def _build_html(
+    operation: str,
+    name: str,
+    service: str,
+    date: str,
+    time: str,
+    tz_name: str = "Europe/Madrid",
+    clinic_name: str = "Clínica Dental Smile",
+    recipient_email: str = "",
+) -> str:
+    greeting = f"Hola {escape(name)}," if name else "Hola,"
+    when = " ".join(p for p in (f"el {escape(date)}" if date else "", f"a las {escape(time)}" if time else "") if p)
+    svc = f"<strong>{escape(service.strip().upper())}</strong>" if service and service.strip() else "su cita"
+    if operation == "cancellation":
+        detail = f"Le confirmamos que su cita de {svc} {when} ha sido <strong>CANCELADA</strong>."
+    elif operation == "reschedule":
+        detail = f"Su cita ha sido reprogramada: {svc} {when}."
+    else:
+        detail = f"Le confirmamos su cita: {svc} {when}."
+
+    buttons = ""
+    if operation in ("booking", "reschedule"):
+        links = select_links_for_email(
+            recipient_email, build_calendar_links(service, date, time, tz_name, clinic_name)
+        )
+        btns = []
+        if "google" in links:
+            btns.append(_button(links["google"], "Añadir a Google Calendar", "#1a73e8"))
+        if "outlook" in links:
+            btns.append(_button(links["outlook"], "Añadir a Outlook", "#0078d4"))
+        if btns:
+            buttons = (
+                '<p style="margin:24px 0 8px;color:#1a1a1a;">Añada la cita a su calendario:</p>'
+                + "<p style=\"margin:0;\">" + "<br>".join(btns) + "</p>"
+            )
+
+    clinic = escape(clinic_name)
+    return (
+        '<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f6f8;">'
+        '<div style="max-width:520px;margin:0 auto;padding:24px;'
+        'font-family:Arial,Helvetica,sans-serif;color:#1a1a1a;font-size:15px;line-height:1.5;">'
+        f"<p>{greeting}</p><p>{detail}</p>{buttons}"
+        f'<p style="color:#666;margin-top:24px;">Gracias por confiar en la {clinic}. '
+        "Si necesita cualquier cambio, llámenos y estaremos encantados de ayudarle.</p>"
+        f'<p style="color:#666;">Un saludo,<br>{clinic}</p>'
+        "</div></body></html>"
     )
 
 
@@ -48,6 +142,8 @@ def make_tool(
     supabase=None,
     phone: str = "",
     patient_name_default: str = "",
+    tz_name: str = "Europe/Madrid",
+    clinic_name: str = "Clínica Dental Smile",
 ) -> StructuredTool:
     async def _run(
         email: str,
@@ -71,9 +167,11 @@ def make_tool(
 
         op = operation if operation in _SUBJECTS else "booking"
         subject = _SUBJECTS[op]
-        body = _build_body(op, patient_name or patient_name_default, service, date, time)
+        name = patient_name or patient_name_default
+        body = _build_body(op, name, service, date, time, tz_name, clinic_name, recipient_email=email)
+        html = _build_html(op, name, service, date, time, tz_name, clinic_name, recipient_email=email)
         try:
-            await email_service.send(email, subject, body)
+            await email_service.send(email, subject, body, html=html)
         except Exception as exc:  # noqa: BLE001 - report failure to the agent, keep call alive
             return ToolEnvelope.fail(
                 f"No se pudo enviar el correo ({exc}). Discúlpese con el paciente."

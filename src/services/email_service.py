@@ -39,17 +39,20 @@ class EmailService:
         """True only if we have enough to actually send."""
         return bool(self._host and self._from_addr)
 
-    async def send(self, to: str, subject: str, body: str) -> None:
-        """Send a plain-text email. Raises on failure (caller maps to an envelope)."""
-        await asyncio.to_thread(self._send_sync, to, subject, body)
-        log.info("email.sent", to=to, subject=subject)
+    async def send(self, to: str, subject: str, body: str, html: str | None = None) -> None:
+        """Send an email. `body` is the plain-text part; if `html` is given it's added
+        as an HTML alternative (multipart/alternative). Raises on failure."""
+        await asyncio.to_thread(self._send_sync, to, subject, body, html)
+        log.info("email.sent", to=to, subject=subject, html=bool(html))
 
-    def _send_sync(self, to: str, subject: str, body: str) -> None:
+    def _send_sync(self, to: str, subject: str, body: str, html: str | None = None) -> None:
         msg = EmailMessage()
         msg["From"] = f"{self._from_name} <{self._from_addr}>"
         msg["To"] = to
         msg["Subject"] = subject
         msg.set_content(body)
+        if html:
+            msg.add_alternative(html, subtype="html")
         # Port 465 = implicit SSL (SMTP_SSL); 587/other = STARTTLS upgrade. Some
         # networks block 587/25 but allow 465, so support both transparently.
         if self._port == 465:
