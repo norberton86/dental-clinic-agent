@@ -50,9 +50,17 @@ class EmailService:
         msg["To"] = to
         msg["Subject"] = subject
         msg.set_content(body)
-        with smtplib.SMTP(self._host, self._port, timeout=20) as smtp:
-            if self._use_tls:
-                smtp.starttls()
-            if self._username:
-                smtp.login(self._username, self._password or "")
-            smtp.send_message(msg)
+        # Port 465 = implicit SSL (SMTP_SSL); 587/other = STARTTLS upgrade. Some
+        # networks block 587/25 but allow 465, so support both transparently.
+        if self._port == 465:
+            with smtplib.SMTP_SSL(self._host, self._port, timeout=20) as smtp:
+                if self._username:
+                    smtp.login(self._username, self._password or "")
+                smtp.send_message(msg)
+        else:
+            with smtplib.SMTP(self._host, self._port, timeout=20) as smtp:
+                if self._use_tls:
+                    smtp.starttls()
+                if self._username:
+                    smtp.login(self._username, self._password or "")
+                smtp.send_message(msg)
