@@ -5,7 +5,7 @@ import pytest
 from src.tools import send_appointment_email
 
 
-PHONE = "+34951840694"
+PHONE = "+34600000000"
 
 
 class FakeEmail:

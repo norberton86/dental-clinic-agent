@@ -2,19 +2,19 @@ from src.services.phone import normalize_phone
 
 
 def test_already_e164_spain():
-    assert normalize_phone("+34951840694") == "+34951840694"
+    assert normalize_phone("+34600000000") == "+34600000000"
 
 
 def test_e164_with_spaces_and_dashes():
-    assert normalize_phone("+34 951-840-694") == "+34951840694"
+    assert normalize_phone("+34 600-000-000") == "+34600000000"
 
 
 def test_spain_national_9_digits():
-    assert normalize_phone("951840694", default_cc="+34") == "+34951840694"
+    assert normalize_phone("600000000", default_cc="+34") == "+34600000000"
 
 
 def test_double_zero_international_prefix():
-    assert normalize_phone("0034951840694") == "+34951840694"
+    assert normalize_phone("0034600000000") == "+34600000000"
 
 
 def test_us_10_digit_when_default_us():

@@ -41,7 +41,7 @@ class ScriptedLLM:
 @pytest.mark.asyncio
 async def test_agent_identifies_caller_then_responds():
     sb = FakeSupabase()
-    tools = [get_patient_by_phone.make_tool(sb, "+34951840694")]
+    tools = [get_patient_by_phone.make_tool(sb, "+34600000000")]
     graph = build_graph(ScriptedLLM(), tools, system_prompt="(test prompt)")
 
     result = await graph.ainvoke(
@@ -50,7 +50,7 @@ async def test_agent_identifies_caller_then_responds():
     )
 
     # the patient lookup tool ran
-    assert sb.calls == [("get_patient_by_phone", {"p_phone": "+34951840694"})]
+    assert sb.calls == [("get_patient_by_phone", {"p_phone": "+34600000000"})]
     # the final message is the spoken greeting
     final = result["messages"][-1]
     assert "Daily" in final.content

@@ -12,7 +12,7 @@ from src.tools import (
     reschedule_appointment_safe,
 )
 
-PHONE = "+34951840694"
+PHONE = "+34600000000"
 FUTURE = (date.today() + timedelta(days=10)).isoformat()
 
 

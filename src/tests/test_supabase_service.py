@@ -16,7 +16,7 @@ async def test_rpc_posts_to_correct_endpoint_with_headers():
     )
     client = SupabaseClient(URL, KEY)
     try:
-        data = await client.rpc("get_patient_by_phone", {"p_phone": "+34951840694"})
+        data = await client.rpc("get_patient_by_phone", {"p_phone": "+34600000000"})
     finally:
         await client.aclose()
 
@@ -24,7 +24,7 @@ async def test_rpc_posts_to_correct_endpoint_with_headers():
     req = route.calls.last.request
     assert req.headers["apikey"] == KEY
     assert req.headers["authorization"] == f"Bearer {KEY}"
-    assert b"+34951840694" in req.content
+    assert b"+34600000000" in req.content
 
 
 @respx.mock
@@ -38,7 +38,7 @@ async def test_rpc_retries_on_500_then_succeeds():
     )
     client = SupabaseClient(URL, KEY)
     try:
-        data = await client.rpc("cancel_appointment", {"p_phone": "+34951840694"})
+        data = await client.rpc("cancel_appointment", {"p_phone": "+34600000000"})
     finally:
         await client.aclose()
 
