@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     deepgram_api_key: str = ""
     deepgram_model: str = "nova-3"
     deepgram_language: str = "es"
+    # Silence (ms) Deepgram waits before finalizing a transcript. Higher = it waits
+    # through natural mid-sentence pauses instead of cutting the caller off; lower =
+    # snappier but risks splitting one sentence into multiple turns. ~400 is balanced.
+    deepgram_endpointing_ms: int = 400
+    # Optional: emit an UtteranceEnd after this gap (ms, must be >=1000). None = off.
+    deepgram_utterance_end_ms: int | None = None
 
     # TTS  (Deepgram Aura-2 reuses DEEPGRAM_API_KEY — no separate TTS key/bill)
     tts_provider: Literal["deepgram", "elevenlabs", "azure"] = "deepgram"

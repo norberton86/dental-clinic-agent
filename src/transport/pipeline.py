@@ -19,15 +19,22 @@ _TELNYX_SAMPLE_RATE = 8000  # Telnyx media streams are 8 kHz PCMU
 
 
 def build_pipeline_task(transport, session: CallSession, settings: Settings) -> PipelineTask:
+    # endpointing (ms of silence before finalizing) is configurable so we can stop the
+    # STT cutting the caller off mid-sentence on natural pauses. utterance_end_ms is
+    # optional (only passed if set) and needs interim_results.
+    live_opts = {
+        "model": settings.deepgram_model,        # nova-3
+        "language": settings.deepgram_language,  # "es"
+        "smart_format": True,
+        "punctuate": True,
+        "interim_results": True,
+        "endpointing": settings.deepgram_endpointing_ms,
+    }
+    if settings.deepgram_utterance_end_ms:
+        live_opts["utterance_end_ms"] = settings.deepgram_utterance_end_ms
     stt = DeepgramSTTService(
         api_key=settings.deepgram_api_key,
-        live_options=LiveOptions(
-            model=settings.deepgram_model,        # nova-3
-            language=settings.deepgram_language,  # "es"
-            smart_format=True,
-            punctuate=True,
-            interim_results=True,                 # lets VAD/endpointing fire promptly
-        ),
+        live_options=LiveOptions(**live_opts),
     )
 
     system_prompt = build_system_prompt(session.caller_phone)
