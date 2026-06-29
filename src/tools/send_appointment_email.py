@@ -5,6 +5,7 @@ everything else is built here so the message wording is controlled.
 """
 from __future__ import annotations
 
+import asyncio
 import re
 from html import escape
 
@@ -16,6 +17,16 @@ from ..services.calendar_links import build_calendar_links, select_links_for_ema
 from ..services.email_service import EmailService
 
 log = structlog.get_logger(__name__)
+
+# Fire-and-forget background tasks (the actual SMTP send + persist) so email never
+# blocks the call. We hold references so the tasks aren't garbage-collected.
+_bg_tasks: set = set()
+
+
+def _spawn(coro) -> None:
+    task = asyncio.create_task(coro)
+    _bg_tasks.add(task)
+    task.add_done_callback(_bg_tasks.discard)
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -180,31 +191,35 @@ def make_tool(
         name = patient_name or patient_name_default
         body = _build_body(op, name, service, date, time, tz_name, clinic_name, recipient_email=email)
         html = _build_html(op, name, service, date, time, tz_name, clinic_name, recipient_email=email)
-        try:
-            await email_service.send(email, subject, body, html=html)
-        except Exception as exc:  # noqa: BLE001 - report failure to the agent, keep call alive
-            return ToolEnvelope.fail(
-                f"No se pudo enviar el correo ({exc}). Discúlpese con el paciente."
-            ).to_tool_string()
 
-        # Persist the address to the patient record (email-only update, never blanks
-        # the name). Best-effort: a save failure must NOT fail the already-sent email.
-        if supabase is not None and phone:
+        # Send + persist in the BACKGROUND so SMTP latency never blocks the call. The
+        # address was validated synchronously above, so we can confirm immediately; a
+        # send failure is logged, not surfaced mid-call.
+        async def _send_and_persist() -> None:
             try:
-                await supabase.rpc("update_patient_email", {"p_phone": phone, "p_email": email})
+                await email_service.send(email, subject, body, html=html)
             except Exception as exc:  # noqa: BLE001
-                log.warning("email.persist_failed", phone=phone, error=str(exc))
+                log.warning("email.send_failed", to=email, error=str(exc))
+                return  # don't persist an address whose send failed
+            if supabase is not None and phone:
+                try:
+                    await supabase.rpc("update_patient_email", {"p_phone": phone, "p_email": email})
+                except Exception as exc:  # noqa: BLE001
+                    log.warning("email.persist_failed", phone=phone, error=str(exc))
 
-        return ToolEnvelope.ok(message=f"Correo enviado correctamente a {email}.").to_tool_string()
+        _spawn(_send_and_persist())
+        return ToolEnvelope.ok(message=f"Correo en camino a {email}.").to_tool_string()
 
     return StructuredTool.from_function(
         coroutine=_run,
         name="send_appointment_email",
         description=(
             "Send an appointment confirmation/reminder email AFTER a successful book, "
-            "reschedule, or cancel. Only call this once the caller has agreed to receive "
-            "an email AND you have read the address back and they confirmed it. Pass the "
-            "operation and the service/date/time you just confirmed."
+            "reschedule, or cancel. If the patient already has an email on file, call this "
+            "AUTOMATICALLY with that address (do NOT ask). If there is no email on file, "
+            "only call it after the caller agreed and you confirmed the address. Sends in "
+            "the background (non-blocking). Pass operation + the service/date/time you "
+            "confirmed."
         ),
         args_schema=AppointmentEmailArgs,
     )
