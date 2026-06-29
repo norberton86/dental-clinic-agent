@@ -12,12 +12,17 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     # LLM
-    llm_provider: Literal["anthropic", "openai", "telnyx"] = "anthropic"
+    llm_provider: Literal["anthropic", "openai", "telnyx", "gemini"] = "anthropic"
     telnyx_inference_model: str = "moonshotai/Kimi-K2.6"  # used when llm_provider=telnyx
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1"
     anthropic_api_key: str | None = None
     anthropic_model: str = "claude-sonnet-4-6"
+    # Gemini (Google AI Studio, OpenAI-compatible endpoint). Free-tier keys get
+    # intermittent 503s → max_retries handles it; use a billed key for production.
+    gemini_api_key: str | None = None
+    gemini_model: str = "gemini-2.5-flash-lite"
+    gemini_base_url: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
     # STT
     deepgram_api_key: str = ""

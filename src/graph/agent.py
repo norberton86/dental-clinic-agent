@@ -31,6 +31,21 @@ def make_llm(settings: Settings) -> BaseChatModel:
             streaming=True,
         )
 
+    if settings.llm_provider == "gemini":
+        from langchain_openai import ChatOpenAI
+
+        # Gemini via its OpenAI-compatible endpoint (reuses ChatOpenAI). max_retries
+        # covers the free tier's transient 503 "high demand" spikes.
+        return ChatOpenAI(
+            model=settings.gemini_model,
+            api_key=settings.gemini_api_key,
+            base_url=settings.gemini_base_url,
+            temperature=0.3,
+            streaming=True,
+            stream_usage=True,  # emit token usage during streaming (else metrics read 0)
+            max_retries=4,
+        )
+
     if settings.llm_provider == "anthropic":
         from langchain_anthropic import ChatAnthropic
 

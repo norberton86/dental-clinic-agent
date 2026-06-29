@@ -12,6 +12,7 @@ confirm the imported frame names. This is the most version-sensitive file.
 from __future__ import annotations
 
 import asyncio
+import time
 
 import structlog
 from langchain_core.messages import HumanMessage
@@ -42,6 +43,19 @@ _ERROR_LINE = "Lo siento, ha habido un problema. ¿Puede repetir, por favor?"
 # Fixed hand-off line spoken on any transfer turn — short and consistent, so the
 # call isn't held up by the model's (often long, doubled) transfer narration.
 _TRANSFER_LINE = "Un momento."
+
+
+def _usage_from_event(event) -> tuple[int, int, int]:
+    """(input, output, cached) tokens from an on_chat_model_end event; 0s if absent.
+    Works across providers — usage_metadata is normalized by LangChain."""
+    out = (event.get("data") or {}).get("output")
+    um = getattr(out, "usage_metadata", None)
+    if um is None and out is not None:
+        um = getattr(getattr(out, "message", None), "usage_metadata", None)
+    if not um:
+        return (0, 0, 0)
+    cached = (um.get("input_token_details") or {}).get("cache_read", 0) or 0
+    return (um.get("input_tokens", 0) or 0, um.get("output_tokens", 0) or 0, cached)
 
 
 def _chunk_text(chunk) -> str:
@@ -138,12 +152,18 @@ class LangGraphProcessor(FrameProcessor):
         self._task = asyncio.create_task(self._run_turn(user_text))
 
     async def _run_turn(self, user_text: str) -> None:
+        t0 = time.monotonic()
         log.info("turn.start", correlation_id=self._correlation, user=user_text[:120])
         await self.push_frame(LLMFullResponseStartFrame(), FrameDirection.DOWNSTREAM)
         spoke_any = False
         buffer: list[str] = []
         spoken: set[str] = set()
         messages: list[str] = []
+        # per-turn metrics (latency + tokens + hop counts)
+        in_tok = out_tok = cached_tok = 0
+        llm_calls = 0  # LLM round-trips this turn (hops = llm_calls - 1)
+        tool_runs = 0  # tool executions this turn
+        first_speak_t: float | None = None
         try:
             # Collect each DISTINCT message's text, then speak only the FINAL one.
             # In a ReAct turn the model frequently narrates alongside a tool call
@@ -161,11 +181,18 @@ class LangGraphProcessor(FrameProcessor):
                 if ev == "on_chat_model_stream":
                     buffer.append(_chunk_text(event["data"]["chunk"]))
                 elif ev == "on_chat_model_end":
+                    llm_calls += 1
+                    i, o, c = _usage_from_event(event)
+                    in_tok += i
+                    out_tok += o
+                    cached_tok += c
                     text = "".join(buffer).strip()
                     buffer = []
                     if text and text not in spoken:
                         spoken.add(text)
                         messages.append(text)
+                elif ev == "on_tool_end":
+                    tool_runs += 1
             # Transfer turn → one fixed hand-off line (the processor transfers once it
             # finishes playing). Otherwise speak ONLY the final assistant message.
             if self._control is not None and self._control.transfer_requested:
@@ -175,9 +202,22 @@ class LangGraphProcessor(FrameProcessor):
             else:
                 to_speak = []
             for text in to_speak:
+                if first_speak_t is None:
+                    first_speak_t = time.monotonic()
                 spoke_any = True
                 await self.push_frame(TextFrame(text), FrameDirection.DOWNSTREAM)
-            log.info("turn.end", correlation_id=self._correlation, spoke=spoke_any)
+            log.info(
+                "turn.metrics",
+                correlation_id=self._correlation,
+                total_s=round(time.monotonic() - t0, 2),
+                ttf_audio_s=round(first_speak_t - t0, 2) if first_speak_t else None,
+                llm_calls=llm_calls,       # round-trips (hops = llm_calls - 1)
+                tool_runs=tool_runs,
+                in_tok=in_tok,
+                out_tok=out_tok,
+                cached_tok=cached_tok,
+                spoke=spoke_any,
+            )
         except asyncio.CancelledError:
             log.info("turn.cancelled", correlation_id=self._correlation)
             await self.push_frame(LLMFullResponseEndFrame(), FrameDirection.DOWNSTREAM)
