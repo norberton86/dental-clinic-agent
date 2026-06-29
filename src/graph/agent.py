@@ -42,6 +42,7 @@ def make_llm(settings: Settings) -> BaseChatModel:
             base_url=settings.gemini_base_url,
             temperature=0.3,
             streaming=True,
+            stream_usage=True,  # emit token usage during streaming (else metrics read 0)
             max_retries=4,
         )
 
