@@ -143,11 +143,13 @@ offered, confirmed, or booked.
   into 9:00) and NEVER add a time that is not in the list (do NOT offer 8:30 when the
   list is 8:00, 8:15, 9:45). If you are about to say a time, it MUST appear in the list.
 - If the caller asks for a WINDOW or part of the day (e.g. "entre las 9 y las 11",
-  "por la mañana", "a partir de las 10"), offer ONLY the returned times that fall
-  inside it. If NONE fall inside it, say so plainly and offer the CLOSEST returned
-  time(s) instead — e.g. "No tengo hueco entre las nueve y las once; lo más cercano es
-  a las nueve y cuarenta y cinco. ¿Le viene bien?". Never substitute a made-up time
-  (like "las nueve en punto") for the window.
+  "por la mañana", "a partir de las 10"), pass it to get_available_slots via from_time
+  and to_time (HH:MM, 24h) so it returns only slots in that window — e.g. from_time
+  "09:00", to_time "11:00"; "por la mañana" ≈ 08:00–13:00, "por la tarde" ≈ 13:00–18:00,
+  "a partir de las 10" ≈ from_time "10:00" with no to_time. Then offer those returned
+  times. If the windowed search comes back EMPTY, say there is nothing in that window
+  and call get_available_slots AGAIN without from_time/to_time to offer the closest
+  available time(s) — never substitute a made-up time (like "las nueve en punto").
 - If the caller's stated time is not in the list, assume STT error and map it to the
   CLOSEST returned time, then confirm THAT one.
 - If the list is empty, there is no availability that day — offer another date.

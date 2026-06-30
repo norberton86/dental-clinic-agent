@@ -48,6 +48,21 @@ class UpsertPatientArgs(BaseModel):
 class AvailableSlotsArgs(BaseModel):
     service_name: ServiceName = Field(..., description="Exact service: Cleaning, Whitening or Extraction")
     date: str = Field(..., description="Date in YYYY-MM-DD")
+    from_time: str | None = Field(
+        None,
+        description=(
+            "Optional earliest start time HH:MM (24h). Pass it when the caller wants a "
+            "window/part of day, e.g. '09:00' for 'entre las 9 y las 11', '08:00' for "
+            "'por la mañana'. Omit when they have no time preference."
+        ),
+    )
+    to_time: str | None = Field(
+        None,
+        description=(
+            "Optional latest start time HH:MM (24h), e.g. '11:00' for 'entre las 9 y las "
+            "11', '13:00' for 'por la mañana'. Omit when they have no time preference."
+        ),
+    )
 
 
 class BookArgs(BaseModel):
