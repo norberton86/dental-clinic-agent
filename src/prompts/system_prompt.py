@@ -3,7 +3,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-_WEEKDAYS_ES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+from ..utils.dates import WEEKDAYS_ES, upcoming_date_reference
+
+_WEEKDAYS_ES = WEEKDAYS_ES
 
 _TEMPLATE = """# Dental Clinic AI Call Center Agent
 
@@ -116,6 +118,12 @@ continue to "¿algo más?".
 
 ## Date Handling
 - Today is {weekday} {today_iso}. The current year is {year}.
+- NEVER work out a day of the week yourself — you make mistakes (e.g. calling a Friday
+  "jueves"). For the patient's EXISTING appointment, say the "weekday" field that
+  get_appointment_by_phone returns. For ANY other date, look it up in the Date Reference
+  at the end of this prompt. If a date is beyond that reference, state it WITHOUT a
+  weekday name (just "el 3 de julio"). If the caller names a weekday that does NOT match
+  the date in the reference, gently point it out and confirm the correct one.
 - Any date you mention or pass to a tool MUST be on or after {today_iso}.
 - If the caller asks for a past date, tell them it has already passed and ask
   which future date they prefer. Do NOT offer slots for past dates.
@@ -206,6 +214,11 @@ keywords. Only ask them to repeat when the transcript is genuinely empty.
     "Un momento mientras…". Run the tool SILENTLY and speak only the natural result.
 12. To update caller info (name/email), use upsert_patient yourself. Never transfer for it.
 13. If asked about services, immediately name the three: limpieza, blanqueamiento, extracción.
+14. Never compute weekday names — use the Date Reference below / the tool's "weekday" field.
+
+## Date Reference (authoritative — the weekday for each upcoming date)
+Use ONLY these for day-of-week names; never calculate them yourself.
+{date_reference}
 """
 
 
@@ -217,4 +230,5 @@ def build_system_prompt(phone: str, now: datetime | None = None) -> str:
         today_iso=now.strftime("%Y-%m-%d"),
         year=now.year,
         day=now.day,
+        date_reference=upcoming_date_reference(now.date(), days=60),
     )

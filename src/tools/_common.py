@@ -6,14 +6,26 @@ boilerplate so each tool reads as just "what it does".
 """
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
+
 from ..models.schemas import ToolEnvelope
 from ..services.supabase_client import SupabaseClient, SupabaseError
 
 
-async def rpc_envelope(client: SupabaseClient, fn: str, payload: dict) -> str:
-    """Call a Supabase RPC and wrap success/error in the standard envelope string."""
+async def rpc_envelope(
+    client: SupabaseClient,
+    fn: str,
+    payload: dict,
+    transform: Callable[[Any], Any] | None = None,
+) -> str:
+    """Call a Supabase RPC and wrap success/error in the standard envelope string.
+    `transform` optionally post-processes the returned data before it is wrapped
+    (e.g. to enrich rows with a computed field)."""
     try:
         data = await client.rpc(fn, payload)
+        if transform is not None:
+            data = transform(data)
         return ToolEnvelope.ok(data=data).to_tool_string()
     except SupabaseError as exc:
         return ToolEnvelope.fail(str(exc)).to_tool_string()
